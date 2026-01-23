@@ -1,1 +1,3 @@
-# dart-lan-session
+# dart_lan_session
+
+A new Flutter project.
