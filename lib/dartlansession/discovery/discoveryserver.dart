@@ -1,5 +1,12 @@
 import 'dart:io';
-import 'package:dart_lan_session/dartlansession/types.dart';
+import 'dart:typed_data';
+
+typedef MessageCallback =
+    (bool, Uint8List) Function(
+      InternetAddress address,
+      int port,
+      Uint8List data,
+    );
 
 class DiscoveryServer {
   RawDatagramSocket? _socket;

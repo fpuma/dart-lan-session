@@ -7,25 +7,28 @@ class TcpSessionServer {
   final Map<int, Socket> _clients = {};
   int _nextClientId = 1;
 
-  // Callbacks
-  void Function(int clientId)? _onConnected;
-  void Function(int clientId)? _onDisconnected;
-
   bool get isListening => _server != null;
 
-  Future<void> startListening(int port) async {
+  Future<void> startListening(
+    int port,
+    void Function(int clientId, Uint8List data) onData,
+    void Function(int clientId) onConnected,
+    void Function(int clientId) onDisconnected,
+  ) async {
     _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
 
     _server!.listen((Socket socket) {
       final clientId = _nextClientId++;
       _clients[clientId] = socket;
 
-      _onConnected?.call(clientId);
+      onConnected(clientId);
 
       socket.listen(
-        (_) {},
-        onDone: () => _handleDisconnect(clientId),
-        onError: (_) => _handleDisconnect(clientId),
+        (data) {
+          onData(clientId, data);
+        },
+        onDone: () => _handleDisconnect(clientId, onDisconnected),
+        onError: (_) => _handleDisconnect(clientId, onDisconnected),
       );
     });
   }
@@ -38,14 +41,6 @@ class TcpSessionServer {
 
     await _server?.close();
     _server = null;
-  }
-
-  void onConnected(void Function(int clientId) callback) {
-    _onConnected = callback;
-  }
-
-  void onDisconnected(void Function(int clientId) callback) {
-    _onDisconnected = callback;
   }
 
   void broadcast(dynamic data) {
@@ -67,10 +62,13 @@ class TcpSessionServer {
   // Internal helpers
   // ---------------------------
 
-  void _handleDisconnect(int clientId) {
+  void _handleDisconnect(
+    int clientId,
+    void Function(int clientId)? onDisconnected,
+  ) {
     final socket = _clients.remove(clientId);
     socket?.close();
-    _onDisconnected?.call(clientId);
+    onDisconnected?.call(clientId);
   }
 
   Uint8List _normalizeData(dynamic data) {

@@ -5,25 +5,21 @@ import 'dart:typed_data';
 class TcpSessionClient {
   Socket? _socket;
 
-  // Callbacks
-  void Function()? _onConnected;
-  void Function()? _onDisconnected;
-  void Function(Uint8List data)? _onMessage;
-
-  Future<void> connect(String serverIp, int port) async {
+  Future<void> connect(String serverIp, int port, void Function(Uint8List data) onData, void Function() onConnected, void Function() onDisconnected) async {
     _socket = await Socket.connect(serverIp, port);
 
-    _onConnected?.call();
+    onConnected();
 
     _socket!.listen(
       (data) {
-        _onMessage?.call(Uint8List.fromList(data));
+        onData(data);
       },
       onDone: () {
-        _handleDisconnect();
+        onDisconnected();
       },
       onError: (_) {
-        _handleDisconnect();
+        _socket = null;
+        onDisconnected();
       },
     );
   }
@@ -31,18 +27,6 @@ class TcpSessionClient {
   Future<void> disconnect() async {
     await _socket?.close();
     _socket = null;
-  }
-
-  void onConnected(void Function() callback) {
-    _onConnected = callback;
-  }
-
-  void onDisconnected(void Function() callback) {
-    _onDisconnected = callback;
-  }
-
-  void onMessage(void Function(Uint8List data) callback) {
-    _onMessage = callback;
   }
 
   void sendMessage(dynamic data) {
@@ -55,11 +39,6 @@ class TcpSessionClient {
   // ---------------------------
   // Internal helpers
   // ---------------------------
-
-  void _handleDisconnect() {
-    _socket = null;
-    _onDisconnected?.call();
-  }
 
   Uint8List _normalizeData(dynamic data) {
     if (data is Uint8List) return data;
