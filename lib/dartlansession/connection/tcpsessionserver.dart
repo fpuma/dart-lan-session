@@ -15,6 +15,7 @@ class TcpSessionServer {
     void Function(int clientId) onConnected,
     void Function(int clientId) onDisconnected,
   ) async {
+    //How to handle port already in use?
     _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
 
     _server!.listen((Socket socket) {

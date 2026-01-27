@@ -59,6 +59,7 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
             onPressed: () {
               setState(() {
                 _discoveryServer.stop();
+                _tcpSessionServer.stopListening();
               });
             },
             child: Text("Stop Server"),
@@ -102,6 +103,7 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
                   () {
                     // Handle successful connection
                     setState(() {
+                      _discoveredServers.clear();
                       _connectedServer = (address, port);
                     });
                   },
