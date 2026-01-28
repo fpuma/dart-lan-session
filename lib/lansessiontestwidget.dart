@@ -53,7 +53,7 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
     if (_discoveryServer.isListening) {
       result = Column(
         children: [
-          Text("Server is listening"),
+          Text("Server is listening on port: ${_discoveryServer.port}"),
           Text("Connected clients: ${_connectedClients.length}"),
           TextButton(
             onPressed: () {
@@ -154,7 +154,6 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
             onPressed: () {
               setState(() {
                 _tcpSessionServer.startListening(
-                  _port,
                   (clientId, data) {
                     // Handle data from client
                   },
@@ -170,15 +169,16 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
                       _connectedClients.remove(clientId);
                     });
                   },
+                  port: _port,
                 );
-                _discoveryServer.start(_port, (address, port, data) {
+                _discoveryServer.start((address, port, data) {
                   final message = utf8.decode(data);
                   final shouldReply = message == "DISCOVER_SERVER";
                   final replyData = Uint8List.fromList(
                     utf8.encode("SERVER_HERE"),
                   );
                   return (shouldReply, replyData);
-                });
+                }, port: _port);
               });
             },
           ),

@@ -10,10 +10,10 @@ class TcpSessionServer {
   bool get isListening => _server != null;
 
   Future<void> startListening(
-    int port,
     void Function(int clientId, Uint8List data) onData,
     void Function(int clientId) onConnected,
     void Function(int clientId) onDisconnected,
+    {int port = 0}
   ) async {
     //How to handle port already in use?
     _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
