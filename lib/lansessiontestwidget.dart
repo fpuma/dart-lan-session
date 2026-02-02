@@ -70,7 +70,7 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
       final (address, port) = _connectedServer!;
       result = Column(
         children: [
-          Text("Connected to server: ${address.address}:$port"),
+          Text("Connected to server: ${address.address.toString()}:$port"),
           TextButton(
             onPressed: () {
               setState(() {
@@ -153,32 +153,41 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
             child: Text("Open Server"),
             onPressed: () {
               setState(() {
-                _tcpSessionServer.startListening(
-                  (clientId, data) {
-                    // Handle data from client
-                  },
-                  (clientId) {
-                    // Handle new client connection
-                    setState(() {
-                      _connectedClients.add(clientId);
+                _tcpSessionServer
+                    .startListening(
+                      (clientId, data) {
+                        // Handle data from client
+                      },
+                      (clientId) {
+                        // Handle new client connection
+                        setState(() {
+                          _connectedClients.add(clientId);
+                        });
+                      },
+                      (clientId) {
+                        // Handle client disconnection
+                        setState(() {
+                          _connectedClients.remove(clientId);
+                        });
+                      },
+                      port: _port,
+                    )
+                    .then((addressNPort) {
+                      final (address, port) = addressNPort;
+
+                      if (port == 0) {
+                        return;
+                      }
+
+                      _discoveryServer.start((address, port, data) {
+                        final message = utf8.decode(data);
+                        final shouldReply = message == "DISCOVER_SERVER";
+                        final replyData = Uint8List.fromList(
+                          utf8.encode("SERVER_HERE"),
+                        );
+                        return (shouldReply, replyData);
+                      }, port: _port);
                     });
-                  },
-                  (clientId) {
-                    // Handle client disconnection
-                    setState(() {
-                      _connectedClients.remove(clientId);
-                    });
-                  },
-                  port: _port,
-                );
-                _discoveryServer.start((address, port, data) {
-                  final message = utf8.decode(data);
-                  final shouldReply = message == "DISCOVER_SERVER";
-                  final replyData = Uint8List.fromList(
-                    utf8.encode("SERVER_HERE"),
-                  );
-                  return (shouldReply, replyData);
-                }, port: _port);
               });
             },
           ),

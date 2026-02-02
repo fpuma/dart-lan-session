@@ -9,21 +9,31 @@ class TcpSessionServer {
 
   bool get isListening => _server != null;
 
-  Future<void> startListening(
+  Future<(InternetAddress, int)> startListening(
     void Function(int clientId, Uint8List data) onData,
     void Function(int clientId) onConnected,
-    void Function(int clientId) onDisconnected,
-    {int port = 0}
-  ) async {
-    //How to handle port already in use?
-    _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+    void Function(int clientId) onDisconnected, {
+    int port = 0,
+  }) async {
+    try {
+      _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+    } catch (e) {
+      _server = null;
+      return (InternetAddress.anyIPv4, 0);
+    }
 
+    if (_server == null) {
+      return (InternetAddress.anyIPv4, 0);
+    }
+
+    // This listens for new client connections
     _server!.listen((Socket socket) {
       final clientId = _nextClientId++;
       _clients[clientId] = socket;
 
       onConnected(clientId);
 
+      // This listens for data sent from the connected client
       socket.listen(
         (data) {
           onData(clientId, data);
@@ -32,6 +42,8 @@ class TcpSessionServer {
         onError: (_) => _handleDisconnect(clientId, onDisconnected),
       );
     });
+
+    return (_server!.address, _server!.port);
   }
 
   Future<void> stopListening() async {

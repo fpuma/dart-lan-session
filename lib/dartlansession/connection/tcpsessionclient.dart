@@ -5,8 +5,22 @@ import 'dart:typed_data';
 class TcpSessionClient {
   Socket? _socket;
 
-  Future<void> connect(String serverIp, int port, void Function(Uint8List data) onData, void Function() onConnected, void Function() onDisconnected) async {
-    _socket = await Socket.connect(serverIp, port);
+  Future<bool> connect(
+    String serverIp,
+    int port,
+    void Function(Uint8List data) onData,
+    void Function() onConnected,
+    void Function() onDisconnected,
+  ) async {
+    try {
+      _socket = await Socket.connect(serverIp, port);
+    } catch (e) {
+      return false;
+    }
+
+    if (_socket == null) {
+      return false;
+    }
 
     onConnected();
 
@@ -15,13 +29,16 @@ class TcpSessionClient {
         onData(data);
       },
       onDone: () {
+        disconnect();
         onDisconnected();
       },
       onError: (_) {
-        _socket = null;
+        disconnect();
         onDisconnected();
       },
     );
+
+    return true;
   }
 
   Future<void> disconnect() async {
