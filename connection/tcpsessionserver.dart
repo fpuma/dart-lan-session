@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
+export 'dart:io';
+export 'dart:typed_data';
+
 class TcpSessionServer {
   ServerSocket? _server;
   final Map<int, Socket> _clients = {};

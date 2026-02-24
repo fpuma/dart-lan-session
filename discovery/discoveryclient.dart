@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
 
+export 'dart:io';
+export 'dart:typed_data';
+
 class DiscoveryClient {
   bool _isDiscovering = false;
 

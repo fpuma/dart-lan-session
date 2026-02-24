@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
+export 'dart:typed_data';
+
 class TcpSessionClient {
   Socket? _socket;
 
