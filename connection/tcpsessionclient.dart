@@ -7,6 +7,8 @@ export 'dart:typed_data';
 class TcpSessionClient {
   Socket? _socket;
 
+  bool get isConnected => _socket != null;
+
   Future<bool> connect(
     String serverIp,
     int port,
