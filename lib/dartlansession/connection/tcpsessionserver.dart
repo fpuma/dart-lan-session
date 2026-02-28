@@ -11,6 +11,7 @@ class TcpSessionServer {
   int _nextClientId = 1;
 
   bool get isListening => _server != null;
+  int get port => _server?.port ?? 0;
 
   Future<(InternetAddress, int)> startListening(
     void Function(int clientId, Uint8List data) onData,
