@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 
 export 'dart:io';
@@ -45,6 +44,8 @@ class TcpSessionServer {
         onDone: () => _handleDisconnect(clientId, onDisconnected),
         onError: (_) => _handleDisconnect(clientId, onDisconnected),
       );
+
+      socket.add(_clientIdToBytes(clientId));
     });
 
     return (_server!.address, _server!.port);
@@ -60,19 +61,20 @@ class TcpSessionServer {
     _server = null;
   }
 
-  void broadcast(dynamic data) {
-    final bytes = _normalizeData(data);
-    for (final socket in _clients.values) {
-      socket.add(bytes);
-    }
+  void broadcast(Uint8List data) {
+    _clients.forEach((clientId, socket) {
+      final messageWithHeader = _addClientIdHeader(clientId, data);
+      socket.add(messageWithHeader);
+    });
   }
 
-  void sendMessage(int clientId, dynamic data) {
+  void sendMessage(int clientId, Uint8List data) {
     final socket = _clients[clientId];
+    
     if (socket == null) return;
 
-    final bytes = _normalizeData(data);
-    socket.add(bytes);
+    final messageWithHeader = _addClientIdHeader(clientId, data);
+    socket.add(messageWithHeader);
   }
 
   // ---------------------------
@@ -88,11 +90,18 @@ class TcpSessionServer {
     onDisconnected?.call(clientId);
   }
 
-  Uint8List _normalizeData(dynamic data) {
-    if (data is Uint8List) return data;
-    if (data is List<int>) return Uint8List.fromList(data);
-    if (data is String) return Uint8List.fromList(utf8.encode(data));
+  Uint8List _clientIdToBytes(int clientId) {
+    final byteData = ByteData(4);
+    byteData.setInt32(0, clientId, Endian.little);
+    return byteData.buffer.asUint8List();
+  }
 
-    throw ArgumentError("Data must be String, List<int>, or Uint8List");
+  Uint8List _addClientIdHeader(int clientId, Uint8List data) {
+    Uint8List clientIdBytes = _clientIdToBytes(clientId);
+
+    final messageWithHeader = Uint8List(clientIdBytes.length + data.length);
+    messageWithHeader.setRange(0, clientIdBytes.length, clientIdBytes);
+    messageWithHeader.setRange(clientIdBytes.length, messageWithHeader.length, data);
+    return messageWithHeader;
   }
 }

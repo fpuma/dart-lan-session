@@ -1,11 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'dartlansession/connection/tcpsessionclient.dart';
 import 'dartlansession/connection/tcpsessionserver.dart';
 import 'dartlansession/discovery/discoveryclient.dart';
 import 'dartlansession/discovery/discoveryserver.dart';
-import 'dart:typed_data';
 import 'dart:convert';
 
 class LanSessionTestWidget extends StatefulWidget {
@@ -25,7 +22,7 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
 
   final List<int> _connectedClients = [];
   final List<(InternetAddress, int, Uint8List)> _discoveredServers = [];
-  (InternetAddress, int)? _connectedServer;
+  (InternetAddress, int, int)? _connectedServer;
 
   @override
   void initState() {
@@ -46,9 +43,20 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
     super.dispose();
   }
 
+  final TextEditingController _clientIdController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
+
+  final List<String> _logMessages = [];
+
   @override
   Widget build(BuildContext context) {
     Widget result;
+
+    List<Widget> logWidgets = [];
+
+    for (final log in _logMessages) {
+      logWidgets.add(Text(log));
+    }
 
     if (_discoveryServer.isListening) {
       result = Column(
@@ -60,17 +68,64 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
               setState(() {
                 _discoveryServer.stop();
                 _tcpSessionServer.stopListening();
+                _logMessages.clear();
               });
             },
             child: Text("Stop Server"),
           ),
+          SizedBox(
+            width: 200,
+            child: TextField(
+              controller: _clientIdController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'ClientId',
+                hintText: 'Enter client ID',
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 200,
+            child: TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                labelText: 'Msg',
+                hintText: 'Enter message',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                final clientId = int.tryParse(_clientIdController.text);
+                final data = utf8.encode(_messageController.text);
+                _tcpSessionServer.sendMessage(clientId!, data);
+                _messageController.clear();
+                _clientIdController.clear();
+              });
+            },
+            child: Text("Send"),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                final data = utf8.encode(_messageController.text);
+                _tcpSessionServer.broadcast(data);
+                _messageController.clear();
+              });
+            },
+            child: Text("Broadcast"),
+          ),
+          ...logWidgets
         ],
       );
     } else if (_connectedServer != null) {
-      final (address, port) = _connectedServer!;
+      final (address, port, clientId) = _connectedServer!;
       result = Column(
         children: [
-          Text("Connected to server: ${address.address.toString()}:$port"),
+          Text(
+            "Connected to server: ${address.address.toString()}:$port (Client ID: $clientId)",
+          ),
           TextButton(
             onPressed: () {
               setState(() {
@@ -80,6 +135,27 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
             },
             child: Text("Disconnect"),
           ),
+          SizedBox(
+            width: 200,
+            child: TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                labelText: 'Msg',
+                hintText: 'Enter message',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                final data = utf8.encode(_messageController.text);
+                _tcpSessionClient.sendMessage(data);
+                _messageController.clear();
+              });
+            },
+            child: Text("Send"),
+          ),
+          ...logWidgets
         ],
       );
     } else if (_discoveryClient.isDiscovering) {
@@ -98,19 +174,22 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
                   address.address,
                   port,
                   (data) {
-                    // Handle incoming data from server
+                    setState(() {
+                      _logMessages.add(utf8.decode(data));
+                    });
                   },
-                  () {
+                  (int clientId) {
                     // Handle successful connection
                     setState(() {
                       _discoveredServers.clear();
-                      _connectedServer = (address, port);
+                      _connectedServer = (address, port, clientId);
                     });
                   },
                   () {
                     // Handle disconnection
                     setState(() {
                       _connectedServer = null;
+                      _logMessages.clear();
                     });
                   },
                 );
@@ -156,7 +235,10 @@ class _LanSessionTestWidgetState extends State<LanSessionTestWidget> {
                 _tcpSessionServer
                     .startListening(
                       (clientId, data) {
-                        // Handle data from client
+                        // Handle incoming data from clients
+                        setState(() {
+                          _logMessages.add("($clientId): ${utf8.decode(data)}");
+                        });
                       },
                       (clientId) {
                         // Handle new client connection
