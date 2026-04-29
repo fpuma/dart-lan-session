@@ -1,19 +1,20 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 
 export 'dart:typed_data';
 
 class TcpSessionClient {
   Socket? _socket;
+  int _clientId = -1;
 
   bool get isConnected => _socket != null;
+  int get clientId => _clientId;
 
   Future<bool> connect(
     String serverIp,
     int port,
     void Function(Uint8List data) onData,
-    void Function() onConnected,
+    void Function(int) onConnected,
     void Function() onDisconnected,
   ) async {
     try {
@@ -26,11 +27,9 @@ class TcpSessionClient {
       return false;
     }
 
-    onConnected();
-
     _socket!.listen(
       (data) {
-        onData(data);
+        _internalOnData(data, onData, onConnected);
       },
       onDone: () {
         disconnect();
@@ -47,25 +46,40 @@ class TcpSessionClient {
 
   Future<void> disconnect() async {
     await _socket?.close();
+    _clientId = -1;
     _socket = null;
   }
 
-  void sendMessage(dynamic data) {
+  void sendMessage(Uint8List data) {
     if (_socket == null) return;
 
-    final bytes = _normalizeData(data);
-    _socket!.add(bytes);
+    _socket!.add(data);
   }
 
-  // ---------------------------
-  // Internal helpers
-  // ---------------------------
+  void _internalOnData(Uint8List data, Function(Uint8List) onData, Function(int) onConnected) {
+    if (data.length < 4) {
+      throw Exception("Received data is too short to contain client ID");
+    }
 
-  Uint8List _normalizeData(dynamic data) {
-    if (data is Uint8List) return data;
-    if (data is List<int>) return Uint8List.fromList(data);
-    if (data is String) return Uint8List.fromList(utf8.encode(data));
+    if(data.length == 4) {
+      // This is the initial message from the server containing the client ID
+      if(_clientId != -1) {
+        throw Exception("Received client ID message, but client ID is already set");
+      }
 
-    throw ArgumentError("Data must be String, List<int>, or Uint8List");
+      _clientId = ByteData.sublistView(data).getInt32(0, Endian.little);
+      onConnected(_clientId);
+      return;
+    }
+
+    final msgClientId = ByteData.sublistView(data).getInt32(0, Endian.little);
+
+    if(msgClientId != _clientId) {
+      throw Exception("Received message with client ID $msgClientId, but expected $_clientId");
+    }
+
+    final msgData = ByteData.sublistView(data).buffer.asUint8List(4); // Skip the first 4 bytes (client ID header)
+    onData(msgData);
   }
+
 }
