@@ -37,7 +37,7 @@ class TcpSessionServer {
       // This listens for data sent from the connected client
       socket.listen(
         (data) {
-          onData(clientId, data);
+          _internalOnData(clientId, data, onData);
         },
         onDone: () => _handleDisconnect(clientId, onDisconnected),
         onError: (_) => _handleDisconnect(clientId, onDisconnected),
@@ -79,6 +79,39 @@ class TcpSessionServer {
   // ---------------------------
   // Internal helpers
   // ---------------------------
+
+  void _internalOnData(
+    int clientId,
+    Uint8List data,
+    void Function(int clientId, Uint8List data) onData,
+  ) {
+    if (!_clients.containsKey(clientId)) {
+      return;
+    }
+
+    if (data.length < 4) {
+      throw Exception("Received data is too short to contain the header");
+    }
+
+    int cursor = 0;
+    while(cursor < data.length) {
+      if (cursor + 4 > data.length) {
+        throw Exception("Received data is too short to contain the length header");
+      }
+
+      final messageLength = ByteData.sublistView(data).getInt32(cursor, Endian.little);
+      cursor += 4;
+
+      if (cursor + messageLength > data.length) {
+        throw Exception("Received data is too short to contain the full message");
+      }
+
+      final messageData = ByteData.sublistView(data).buffer.asUint8List(cursor, messageLength);
+      cursor += messageLength;
+
+      onData(clientId, messageData);
+    }
+  }
 
   void _handleDisconnect(
     int clientId,
