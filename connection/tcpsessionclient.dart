@@ -57,29 +57,40 @@ class TcpSessionClient {
   }
 
   void _internalOnData(Uint8List data, Function(Uint8List) onData, Function(int) onConnected) {
+
     if (data.length < 4) {
-      throw Exception("Received data is too short to contain client ID");
+      throw Exception("Received data is too short to contain the header");
     }
 
-    if(data.length == 4) {
-      // This is the initial message from the server containing the client ID
-      if(_clientId != -1) {
-        throw Exception("Received client ID message, but client ID is already set");
+    int cursor = 0;
+    while (cursor < data.length) {
+      int dataLength = ByteData.sublistView(data).getInt32(cursor, Endian.little);
+      cursor += 4;
+
+      if(dataLength == 0) {
+        // This is the initial message from the server containing the client ID
+        if(_clientId != -1) {
+          throw Exception("Received client ID message, but client ID is already set");
+        }
+
+        _clientId = ByteData.sublistView(data).getInt32(cursor, Endian.little);
+        cursor += 4;
+        onConnected(_clientId);
       }
+      else {
+        final msgClientId = ByteData.sublistView(data).getInt32(cursor, Endian.little);
+        cursor += 4;
 
-      _clientId = ByteData.sublistView(data).getInt32(0, Endian.little);
-      onConnected(_clientId);
-      return;
+        if(msgClientId != _clientId) {
+          throw Exception("Received message with client ID $msgClientId, but expected $_clientId");
+        }
+
+        final msgData = ByteData.sublistView(data).buffer.asUint8List(cursor, dataLength);
+        cursor += dataLength;
+        
+        onData(msgData);
+      }
     }
-
-    final msgClientId = ByteData.sublistView(data).getInt32(0, Endian.little);
-
-    if(msgClientId != _clientId) {
-      throw Exception("Received message with client ID $msgClientId, but expected $_clientId");
-    }
-
-    final msgData = ByteData.sublistView(data).buffer.asUint8List(4); // Skip the first 4 bytes (client ID header)
-    onData(msgData);
   }
 
 }
