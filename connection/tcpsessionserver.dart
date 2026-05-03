@@ -34,8 +34,6 @@ class TcpSessionServer {
       final clientId = _nextClientId++;
       _clients[clientId] = socket;
 
-      onConnected(clientId);
-
       // This listens for data sent from the connected client
       socket.listen(
         (data) {
@@ -46,6 +44,7 @@ class TcpSessionServer {
       );
 
       socket.add(_clientIdToBytes(clientId));
+      onConnected(clientId);
     });
 
     return (_server!.address, _server!.port);
