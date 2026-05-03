@@ -43,7 +43,7 @@ class TcpSessionServer {
         onError: (_) => _handleDisconnect(clientId, onDisconnected),
       );
 
-      socket.add(_clientIdToBytes(clientId));
+      sendMessage(clientId, Uint8List(0)); // Send an empty message to trigger the client to set its client ID
       onConnected(clientId);
     });
 
@@ -62,7 +62,7 @@ class TcpSessionServer {
 
   void broadcast(Uint8List data) {
     _clients.forEach((clientId, socket) {
-      final messageWithHeader = _addClientIdHeader(clientId, data);
+      final messageWithHeader = _addHeader(clientId, data);
       socket.add(messageWithHeader);
     });
   }
@@ -72,7 +72,7 @@ class TcpSessionServer {
     
     if (socket == null) return;
 
-    final messageWithHeader = _addClientIdHeader(clientId, data);
+    final messageWithHeader = _addHeader(clientId, data);
     socket.add(messageWithHeader);
   }
 
@@ -89,18 +89,27 @@ class TcpSessionServer {
     onDisconnected?.call(clientId);
   }
 
-  Uint8List _clientIdToBytes(int clientId) {
+  Uint8List _intToBytes(int value) {
     final byteData = ByteData(4);
-    byteData.setInt32(0, clientId, Endian.little);
+    byteData.setInt32(0, value, Endian.little);
     return byteData.buffer.asUint8List();
   }
 
-  Uint8List _addClientIdHeader(int clientId, Uint8List data) {
-    Uint8List clientIdBytes = _clientIdToBytes(clientId);
+  Uint8List _addHeader(int clientId, Uint8List data) {
+    Uint8List dataLengthBytes = _intToBytes(data.length);
+    Uint8List clientIdBytes = _intToBytes(clientId);
 
-    final messageWithHeader = Uint8List(clientIdBytes.length + data.length);
-    messageWithHeader.setRange(0, clientIdBytes.length, clientIdBytes);
-    messageWithHeader.setRange(clientIdBytes.length, messageWithHeader.length, data);
+    final messageWithHeader = Uint8List(dataLengthBytes.length + clientIdBytes.length + data.length);
+    int cursor = 0;
+    messageWithHeader.setRange(cursor, dataLengthBytes.length, dataLengthBytes);
+    cursor += dataLengthBytes.length;
+
+    messageWithHeader.setRange(cursor, cursor + clientIdBytes.length, clientIdBytes);
+    cursor += clientIdBytes.length;
+
+    if(data.isNotEmpty) {
+      messageWithHeader.setRange(cursor, messageWithHeader.length, data);
+    }
     return messageWithHeader;
   }
 }
